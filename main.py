@@ -1,3 +1,4 @@
+from google import genai
 import os
 import shutil
 import json
@@ -8,8 +9,8 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from google.genai import errors
 import gspread
-import google.generativeai as genai
 
 # --- CONFIGURATION ---
 load_dotenv()
@@ -29,7 +30,7 @@ os.makedirs(PROCESSED_DIR, exist_ok=True)
 os.makedirs(MANUAL_REVIEW_DIR, exist_ok=True)
 
 # --- SETUP APIs ---
-genai.configure(api_key=os.environ.get('GEMINI_API_KEY'))
+client = genai.Client()
 
 SCOPES = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets']
 
@@ -84,7 +85,7 @@ def upload_to_drive(filepath):
 def extract_data_with_gemini(filepath):
     print("Extracting data using Gemini AI...")
     
-    sample_file = genai.upload_file(path=filepath, display_name=os.path.basename(filepath))
+    sample_file = client.files.upload(file=filepath, config={'display_name': os.path.basename(filepath)})
     
     prompt = """
     You are an automated assistant for a swimming coaching business. 
@@ -98,16 +99,45 @@ def extract_data_with_gemini(filepath):
     {"date": "2024-05-16", "parent_name": "John Doe", "amount": "150.00", "references": ["REF12345", "DUITNOW6789"]}
     Do not add any formatting like ```json or newlines outside the brackets.
     """
+    max_retries = 3
+    delay = 5  # Start with a 5-second wait
+    response = None
     
-    model = genai.GenerativeModel(model_name="gemini-2.5-flash")
-    response = model.generate_content([sample_file, prompt])
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[sample_file, prompt]
+            )
+            break  # If successful, break out of the retry loop
+        except Exception as e:
+            # Check if it looks like a server-side 503 or overload issue
+            if "503" in str(e) or "UNAVAILABLE" in str(e).upper():
+                if attempt < max_retries - 1:
+                    print(f" Gemini Server overloaded (503). Retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
+                    time.sleep(delay)
+                    delay *= 2  # Double the wait time for the next attempt (backoff)
+                    continue
+            
+            # If it's a different error or we ran out of retries, log it and clean up
+            print(f"Gemini Inference failed: {e}")
+            try:
+                client.files.delete(name=sample_file.name)
+            except:
+                pass
+            return {"date": "Error", "parent_name": "Error", "amount": "Error", "references": "Error"}
     
+    # Clean up the file from Google's servers
     try:
-        genai.delete_file(sample_file.name)
-    except:
-        pass
+        client.files.delete(name=sample_file.name)
+    except Exception as e:
+        print(f"Temporary file deletion failed: {e}")
     
+    # Parse the response text
     try:
+        if not response:
+            raise ValueError("No response received from Gemini.")
+            
         raw_text = response.text.strip()
         if raw_text.startswith("```json"):
             raw_text = raw_text[7:]
@@ -117,7 +147,7 @@ def extract_data_with_gemini(filepath):
         data = json.loads(raw_text.strip())
         return data
     except Exception as e:
-        print(f"Error parsing Gemini response: {e}\nRaw Response: {response.text}")
+        print(f"Error parsing Gemini response: {e}\nRaw Response: {response.text if response else 'None'}")
         return {"date": "Error", "parent_name": "Error", "amount": "Error", "references": "Error"}
 
 def process_all_receipts():
@@ -197,7 +227,7 @@ def process_all_receipts():
                 known_refs.add(r)
             
             # Small delay to keep Gemini / Drive API healthy
-            time.sleep(1)
+            time.sleep(13)
             
         except Exception as e:
             print(f"Failed to process {filename}: {e}")
