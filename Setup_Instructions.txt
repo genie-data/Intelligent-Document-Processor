@@ -1,0 +1,76 @@
+Welcome to the Swimming Receipt Automation Project!
+This guide is written for a complete beginner. Follow these steps carefully to set up the automation on your device.
+
+---
+STEP 1: INSTALL REQUIRED SOFTWARE
+---
+1. Download and install Python from https://www.python.org/downloads/
+   - VERY IMPORTANT: During the installation, check the box that says "Add Python to PATH" before clicking Install.
+2. Place the project folder (which contains `main.py`, etc.) on your computer. Let's assume it's at `C:\Swimming` or `D:\Swimming`.
+
+---
+STEP 2: SET UP THE REQUIRED KEYS AND CREDENTIALS
+---
+This project relies on two main services: Google Gemini AI (to read the receipts) and Google Workspace (Drive and Sheets, to store them). You need to provide keys so the script has permission to use them.
+
+1. Gemini API Key (for the AI)
+   - Go to Google AI Studio (https://aistudio.google.com/) and sign in with your Google account.
+   - Click "Get API key" and create a new key.
+   - In your project folder, create a new text file and name it exactly `.env` (don't forget the dot at the beginning). 
+   - Open `.env` in Notepad and add this single line, replacing YOUR_API_KEY with the key you just copied:
+     GEMINI_API_KEY=YOUR_API_KEY
+     (The file should just contain that one line).
+
+2. Google Cloud Credentials (for Drive and Sheets)
+   - Go to the Google Cloud Console (https://console.cloud.google.com/).
+   - Create a new project.
+   - Go to "APIs & Services" > "Library" and enable the "Google Drive API" and "Google Sheets API".
+   - Go to "APIs & Services" > "OAuth consent screen" and set it up as "External" (add your own email as a test user if it's in testing mode).
+   - Go to "APIs & Services" > "Credentials". Click "Create Credentials" -> "OAuth client ID".
+   - Choose "Desktop app" as the Application type. Give it a name and click Create.
+   - Click "Download JSON" to download your credentials file.
+   - Rename the downloaded file to exactly `client_secret.json`.
+   - Place `client_secret.json` directly into your project folder next to `main.py`.
+
+---
+STEP 3: GOOGLE DRIVE AND SHEETS CONFIGURATION
+---
+Inside the `main.py` file, there are two important IDs at the top of the file around line 18:
+   DRIVE_FOLDER_ID = '1JxP59PFNmupIw5ospvvgJcyzUaQvG6Va'
+   SPREADSHEET_ID = '1drXZ8fR4dYdPfRNuDJX9A5xum71l90Y5DiFiixzkRZM'
+
+If you want the script to save receipts to YOUR own Google Drive folder and Spreadsheet:
+1. Drive Folder ID: Open your Google Drive, create a folder for receipts, and open it. Look at the URL in your browser. The ID is the long string of letters and numbers at the end (e.g., https://drive.google.com/drive/folders/YOUR_FOLDER_ID). Replace the ID in `main.py` with yours.
+2. Spreadsheet ID: Open your Google Sheet. The ID is in the URL between "/d/" and "/edit" (e.g., https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit). Replace the ID in `main.py` with yours.
+   - Note: The script expects the sheet to have columns like: Date | Parent Name | Student Name | Amount | Reference | Receipt Link
+
+---
+STEP 4: INSTALL DEPENDENCIES AND RUN
+---
+1. Open your computer's terminal (Command Prompt on Windows).
+2. Navigate to your project folder. Type `cd D:\Swimming` (or wherever your folder is located) and press Enter.
+3. Install the required Python libraries by typing:
+   pip install -r requirements.txt
+   (Press Enter and wait for it to finish downloading).
+
+---
+STEP 5: YOUR FIRST RUN (AUTHENTICATION)
+---
+1. In the terminal, type:
+   python main.py
+   and press Enter.
+2. Because it's the first time running, a web browser window will automatically pop up asking you to log into your Google Account.
+3. Log in and grant the requested permissions for Google Drive and Google Sheets.
+4. Once done, the script will generate a new file called `token.json` in your folder. You won't have to log in via the browser again unless the token expires or is deleted.
+
+---
+HOW TO USE IT DAILY
+---
+- Manual Run: 
+  Put your downloaded bank receipt PDFs into the `Incoming_Receipts` folder.
+  Double-click `main.py` or run `python main.py` in your terminal. The script will process them, upload them, add them to your sheet, and move the PDFs to the `Processed_Receipts` folder. If there's an error, it moves them to `Manual_Review_Receipts`.
+
+- Automated Schedule (Optional):
+  If you want it to run automatically every day at 8:00 AM and 6:00 PM, you can use Dagster (which is included in your setup). In your terminal, run:
+  dagster dev -f dagster_pipeline.py
+  (Keep the terminal open to let it run on schedule).

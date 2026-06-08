@@ -1,0 +1,16 @@
+# Ignore environment variables
+.env
+
+# Ignore Google API credentials and tokens
+client_secret.json
+token.json
+credentials.json
+
+# Ignore local receipt folders (optional, but recommended so you don't upload private receipts)
+Incoming_Receipts/
+Processed_Receipts/
+Manual_Review_Receipts/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
